@@ -5,6 +5,6 @@
 extern void pinConfigOctaver(void);
 extern void setupOctaver(void);
 extern void loopOctaver(void);
-extern void processOctaverAudio(int inputSample); 
+extern void processOctaverAudio(int16_t inputSample); 
 
 #endif

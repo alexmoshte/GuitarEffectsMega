@@ -6,6 +6,6 @@ extern void createSineTable(void);
 extern void pinConfigSinewave(void);
 extern void setupSinewave(void);
 extern void loopSinewave(void);
-extern void processSinewaveAudio(int inputSample); 
+extern void processSinewaveAudio(int16_t inputSample); 
 
 #endif

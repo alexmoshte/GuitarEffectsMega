@@ -5,8 +5,8 @@
 
 /*Effects selectable through buttons A3 - A6*/
 #define NORMAL
-#define OCTAVER
 #define REVERB
+#define OCTAVER
 #define ECHO
 #define DISTORTION
 #define SINEWAVE 
@@ -14,7 +14,7 @@
 /*Hardware interface resource definitions*/
 #define TOGGLE 2  // Reverb sub-mode toggle switch: HIGH for REVERB_ECHO_MODE, LOW for DELAY_MODE
 #define FOOTSWITCH 10 // Global Momentary Bypass: Press (LOW) for CLEAN_MODE, Release (HIGH) for last selected effect
-#define LED_EFFECT_ON 13
+#define LED 13
 
 /*Audio input/output pin definitions*/
 #define AUDIO_IN A0 // Audio input pin
@@ -43,13 +43,16 @@
 #define MAX_DELAY 500
 
 /*General variables*/
-extern int input_raw_sample; // Will hold the raw 10-bit ADC value (0-1023)
+extern int16_t input; // Will hold the raw 10-bit ADC value (0-1023)
 extern unsigned int ADC_low, ADC_high; // For direct ADC read in ISR
+extern int counter;
+extern volatile int pot2_value;
 
 extern uint16_t delayBuffer[MAX_DELAY]; // Buffer for delay-based effects
 extern uint32_t delayWritePointer;      // Current write position in delayBuffer
 extern uint32_t delayReadOffset;        // Calculated read offset (used in effect processing)
 extern uint32_t delayDepth;             // Not explicitly used in current logic, can be removed if unused
+
 
 extern volatile int pot2_value; // Master Volume, now controlled by PUSHBUTTON_1/2 globally
 
@@ -66,30 +69,12 @@ enum EffectMode {
     NUM_EFFECTS_ENUM        // Helper to count total modes (always last)
 };
 
-extern volatile bool effectActive; // Global ON/OFF state (true if any effect is running, false for clean bypass)
-extern volatile EffectMode lastSelectedMode; // Stores the last selected effect mode (not CLEAN_MODE)
-
-/* Debouncing Variables*/
-extern volatile unsigned long lastFootswitchPressTime;
-extern volatile unsigned long lastToggleSwitchStateChange; // Used by Reverb sub-mode
-extern const unsigned long DEBOUNCE_DELAY_MS;
-extern volatile unsigned long lastPushButton1PressTime;
-extern volatile unsigned long lastPushButton2PressTime;
-
-// Debouncing for effect selection buttons (A1, A2, A3)
-extern volatile unsigned long lastSelectNormalPressTime;
-extern volatile unsigned long lastSelectEffectButtonA2PressTime;
-extern volatile unsigned long lastSelectOctaverPressTime;
-
-/*Counter to periodically check pushbuttons (saves CPU in ISR) - now just for NORMAL's legacy volume*/
-extern volatile int button_check_counter;
-extern const int BUTTON_CHECK_INTERVAL; // Check buttons every 100 samples
+extern volatile bool effectActive; 
+extern volatile EffectMode currentActiveMode; // Initially set, will be updated by setup
+extern volatile EffectMode lastSelectedMode;  // Stores the last non-CLEAN effect mode
 
 /* Configure audio parameters - Consistent 20kHz sample rate */
 extern const long SAMPLE_RATE_MICROS;
-
-
-extern volatile EffectMode currentActiveMode; // Universal variable for the currently active effect mode
 
 /*********************************************FUNCTION DECLARATIONS****************************************************/
 /*Core hardware setup functions*/
@@ -98,13 +83,8 @@ extern void pinConfig ();
 extern void pmwSetup(void);
 extern void volumeControl();
 
-/* Audio processing functions for each effect (called by the universal ISR)
- * All processXAudio functions now accept 'int inputSample' for consistency,
- * even if a generator doesn't use it*/
+/* Audio processing functions for each effect (called by the universal ISR)*/
 extern void processNormalAudio(int inputSample);
 extern void processReverbAudio(int inputSample);
-extern void processEchoAudio(int inputSample);
-extern void processOctaverAudio(int inputSample);
-extern void processDistortionAudio(int inputSample);
-extern void processSinewaveAudio(int inputSample); 
+
 #endif

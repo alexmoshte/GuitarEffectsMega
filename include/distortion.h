@@ -5,6 +5,6 @@
 extern void pinConfigDistortion(void);
 extern void setupDistortion(void);
 extern void loopDistortion(void);
-extern void processDistortionAudio(int inputSample); 
+extern void processDistortionAudio(int16_t inputSample); 
 
 #endif

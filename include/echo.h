@@ -5,6 +5,6 @@
 extern void pinConfigEcho(void);
 extern void setupEcho(void);
 extern void loopEcho(void);
-extern void processEchoAudio(int inputSample);
+extern void processEchoAudio(int16_t inputSample);
 
 #endif

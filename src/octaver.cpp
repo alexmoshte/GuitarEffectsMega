@@ -1,8 +1,6 @@
 #include "octaver.h"
 #include <Arduino.h>
 
-
-
 /*********************************************FUNCTION DEFINITIONS****************************************************/
 void pinConfigOctaver() {
     // No specific pins for Octaver, common pins configured in main.cpp
@@ -16,47 +14,26 @@ void loopOctaver(){
     // No specific loop logic for Octaver, controls handled in main.cpp
 }
 
-/**
- * @brief: Audio processing function for Octaver effect.
- * Currently a placeholder, but processes centered floating-point samples.
- * @param inputSample The raw 10-bit input audio sample (0-1023).
- */
-void processOctaverAudio(int inputSample) {
-    float outputSampleFloat; // Use float for processing
-    float centered_input = (float)inputSample - 511.5; // Center input to -511.5 to 511.5
+void processOctaverAudio(int16_t inputSample) {
+    float outputSampleFloat = (float)inputSample;
 
     if (effectActive) {
-        // --- OCTAVER ALGORITHM PLACEHOLDER ---
-        // This is where your actual Octaver DSP would go.
-        // For a simple test, you could mix a very basic down-pitched signal.
-        // A true octaver requires complex algorithms (e.g., zero-crossing detection, wave shaping).
-        // For now, it behaves as a clean pass-through with volume.
-        
-        outputSampleFloat = centered_input; // Placeholder: currently just passes through centered signal
-        // Example: very crude half-wave rectifier for a simple 'fuzz' or sub-octave like sound
-        // if (centered_input < 0) centered_input = 0; // Half-wave rectification
-        // outputSampleFloat = centered_input;
-
-    } else {
-        outputSampleFloat = centered_input; // Pass through clean signal if effect is bypassed
+        /*Simple sub-octave simulation: half-wave rectification*/
+        float sub_octave = outputSampleFloat;
+        if (sub_octave < 0) sub_octave = 0;
+        /*Mix dry (50%) and sub-octave (50%)*/
+        outputSampleFloat = (outputSampleFloat * 0.5) + (sub_octave * 0.5);
+        /*Soft clipping*/
+        if (outputSampleFloat > 25000.0) outputSampleFloat = 25000.0 * tanh(outputSampleFloat / 25000.0);
+        if (outputSampleFloat < -25000.0) outputSampleFloat = -25000.0 * tanh(outputSampleFloat / -25000.0);
+        outputSampleFloat = constrain(outputSampleFloat, -32768, 32767);
     }
 
-    // --- Final Output Processing ---
-    // Re-bias the processed sample to 0-1023 range
-    int finalOutputSample = (int)(outputSampleFloat + 511.5);
+    /*Apply volume control & constrain*/
+    outputSampleFloat= map(outputSampleFloat, -32768, +32768,-pot2_value, pot2_value);
+    int16_t finalOutputSample = (int16_t)constrain(outputSampleFloat, -32768, 32767);
 
-    // Apply global master volume controlled by PUSHBUTTON_1/2
-    // float volume_factor = pot2_value / 1023.0;
-    // finalOutputSample = (int)(finalOutputSample * volume_factor);
-
-    // Constrain the final output to the valid 10-bit range (0-1023)
-    // finalOutputSample = constrain(finalOutputSample, 0, 1023);
-
-    // // Split for dual PWM output
-    // analogWrite(AUDIO_OUT_A, finalOutputSample / 4);
-    // analogWrite(AUDIO_OUT_B, map(finalOutputSample % 4, 0, 3, 0, 255));
-
-    /*write the PWM output signal*/
-    OCR1AL = ((finalOutputSample + 0x8000) >> 8); // convert to unsigned, send out high byte
+    /*Write the PWM output signal*/
+    OCR1AL = ((finalOutputSample+ 0x8000) >> 8); // convert to unsigned, send out high byte
     OCR1BL = finalOutputSample; // send out low byte
 }

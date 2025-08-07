@@ -5,16 +5,16 @@
 
 static const float SAMPLE_RATE_HZ = 1000000.0 / SAMPLE_RATE_MICROS;
 
-static int nSineTable[SINE_TABLE_SIZE];
+static int16_t nSineTable[SINE_TABLE_SIZE];
 
 static float phase_accumulator = 0.0;
 static float frequency_step = 0.0;
-static int generated_sample = 0;
+static int16_t generated_sample = 0;
 
 /*********************************************FUNCTION DEFINITIONS****************************************************/
 void createSineTable(void){
     for (uint16_t nIndex = 0; nIndex < SINE_TABLE_SIZE; nIndex++) {
-        nSineTable[nIndex] = (uint16_t)(((1.0 + sin(((2.0 * PI) / SINE_TABLE_SIZE) * nIndex)) * 1023.0) / 2.0);
+        nSineTable[nIndex] = (int16_t)(sin(((2.0 * PI) / SINE_TABLE_SIZE) * nIndex) * 32767.0);
     }
 }
 
@@ -35,15 +35,8 @@ void loopSinewave(void){
     // No specific loop logic for Sinewave, controls handled in main.cpp
 }
 
-/**
- * @brief: Audio processing function for generating the sine wave.
- * This function is called by the universal ISR (TIMER1_CAPT_vect) from main.cpp.
- * It generates a sine wave using DDS and outputs it.
- * @param inputSample The raw 10-bit input audio sample (0-1023). This parameter is ignored
- * as the sine wave is generated internally, not processed from input.
- */
-void processSinewaveAudio(int inputSample) { // inputSample parameter included for ISR consistency
-    float outputSampleFloat; // Use float for processing
+void processSinewaveAudio(int16_t inputSample) {
+    float outputSampleFloat;
 
     if (effectActive) {
         phase_accumulator += frequency_step;
@@ -51,7 +44,7 @@ void processSinewaveAudio(int inputSample) { // inputSample parameter included f
         while (phase_accumulator >= SINE_TABLE_SIZE) {
             phase_accumulator -= SINE_TABLE_SIZE;
         }
-        while (phase_accumulator < 0.0) { // Robustness, though frequency_step should be positive
+        while (phase_accumulator < 0.0) {
             phase_accumulator += SINE_TABLE_SIZE;
         }
 
@@ -59,37 +52,24 @@ void processSinewaveAudio(int inputSample) { // inputSample parameter included f
         float fraction = phase_accumulator - idx1;
         int idx2 = (idx1 + 1) % SINE_TABLE_SIZE;
 
-        int sample1 = nSineTable[idx1];
-        int sample2 = nSineTable[idx2];
+        int16_t sample1 = nSineTable[idx1];
+        int16_t sample2 = nSineTable[idx2];
 
-        // Interpolate between sample1 and sample2 to get the final sine sample
-        // These samples are already 0-1023 range, which is perfect for direct output.
-        generated_sample = (int)(sample1 + fraction * (sample2 - sample1));
+        // Interpolate between sample1 and sample2
+        generated_sample = (int16_t)(sample1 + fraction * (sample2 - sample1));
         
-        outputSampleFloat = (float)generated_sample - 511.5; // Center for volume application
-    }
-    else {
-        // If generator is off, output silence (midpoint of 10-bit range) and reset phase
-        outputSampleFloat = 0.0; // Centered silence
-        phase_accumulator = 0.0; // Reset phase for clean restart
+        outputSampleFloat = (float)generated_sample;
+    } else {
+        outputSampleFloat = 0.0; // Silence
+        phase_accumulator = 0.0; // Reset phase
     }
 
-    // --- Final Output Processing ---
-    // Apply Amplitude/Volume control from global pot2_value
-    float amplitude_factor = pot2_value / 1023.0;
-    outputSampleFloat *= amplitude_factor; // Apply volume to the centered signal
+    /*Apply amplitude control*/
+    outputSampleFloat = map(outputSampleFloat, -32768, +32768,-pot2_value, pot2_value);
+    /*Constrain to 16-bit range*/
+    int16_t finalOutputSample = (int16_t)constrain(outputSampleFloat, -32768, 32767);
 
-    // Re-bias the processed sample to 0-1023 range
-    int finalOutputSample = (int)(outputSampleFloat + 511.5);
-
-    // Constrain the final output to the valid 10-bit range (0-1023)
-    // finalOutputSample = constrain(finalOutputSample, 0, 1023);
-
-    // // Split for dual PWM output
-    // analogWrite(AUDIO_OUT_A, finalOutputSample / 4);
-    // analogWrite(AUDIO_OUT_B, map(finalOutputSample % 4, 0, 3, 0, 255));
-
-    /*write the PWM output signal*/
+    /*Write the PWM output signal*/
     OCR1AL = ((finalOutputSample + 0x8000) >> 8); // convert to unsigned, send out high byte
     OCR1BL = finalOutputSample; // send out low byte
 }
